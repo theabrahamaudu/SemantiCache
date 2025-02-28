@@ -9,11 +9,12 @@ class Config:
             yaml_path: str = "./sem_config/sem_config.yaml",
             cache_path: str = "./sem_cache",
             config_path: str = "./sem_config",
-        ) -> None:
+    ) -> None:
 
         self.yaml_path = yaml_path
         self.cache_path = cache_path
         self.config_path = config_path
+
     def load_config(self) -> Dict[str, Any]:
         try:
             with open(self.yaml_path, "r", encoding="utf-8") as f:
@@ -42,10 +43,10 @@ class Config:
 
         if not config_path.exists():
             config_content = """cache:
-                                    cache_path: ./sem_cache
-                                    cache_name: sem_cache_index
-                                    cache_size: 100
-                                    cache_ttl: 3600
-                                    similarity_threshold: 0.1
-                                    """
+    cache_path: ./sem_cache
+    cache_name: sem_cache_index
+    cache_size: 100
+    cache_ttl: 3600
+    similarity_threshold: 0.1
+    """
             config_path.write_text(config_content, encoding="utf-8")

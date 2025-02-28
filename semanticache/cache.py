@@ -7,7 +7,7 @@ from ulid import ULID
 import numpy as np
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_community.docstore.in_memory import InMemoryDocstore
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from semanticache.utils.config import Config
 
@@ -23,11 +23,11 @@ class SemantiCache:
             cache_size: int = server_config["cache_size"],
             ttl: int = server_config["cache_ttl"],
             threshold: float = server_config["similarity_threshold"],
-        ):
+    ):
 
         self.cache_path = cache_path
         self.leaderboard_path = f"{self.cache_path}/leaderboard.json"
-        self.cache_index_object = f"{self.cache_path}/cache_index.pkl"
+        self.cache_index_object = f"{self.cache_path}/sem_cache_index.pkl"
         self.cache_name = cache_name
         self.cache_size = cache_size
         self.ttl = ttl
@@ -51,7 +51,6 @@ class SemantiCache:
             )
             return record.metadata["response"]
         return record
-        
 
     def set(self, query: str, response: str) -> None:
         self.__create_record(
@@ -60,7 +59,6 @@ class SemantiCache:
             response=response,
         )
         self.__trim_cache()
-
 
     def clear(self) -> None:
         """
@@ -74,18 +72,17 @@ class SemantiCache:
         except Exception as e:
             print(f"unable to clear cache: {e}")
 
-
     def __trim_cache(self) -> None:
         try:
             index = pickle.load(open(self.cache_index_object, "rb"))
-            memory: InMemoryDocstore= index[0]
+            memory: InMemoryDocstore = index[0]
             ulid_to_id: dict = index[1]
 
             ids: list[str] = list(ulid_to_id.values())
 
             documents: list[Document] = []
             for _id in ids:
-                documents.append(memory.search(_id))
+                documents.append(memory.search(_id))  # type: ignore
 
             if len(documents) > self.cache_size:
                 ref_list = []
@@ -94,22 +91,25 @@ class SemantiCache:
                         "id": doc.metadata["id"],
                         "hits": doc.metadata["hits"],
                     })
-                sorted_ref_list = sorted(ref_list, key=lambda x: x["hits"], reverse=True)
+                sorted_ref_list = sorted(
+                    ref_list,
+                    key=lambda x: x["hits"],
+                    reverse=True
+                )
                 for doc in sorted_ref_list[self.cache_size:]:
                     self.__delete_record(id=doc["id"])
         except Exception as e:
             print(f"unable to trim cache: {e}")
-
 
     def __create_record(
             self,
             created_at: datetime,
             query: str,
             response: str,
-            updated_at: datetime = None,
-            record_id: str = None,
-            hits: int = None,
-        ) -> str:
+            updated_at: datetime | None = None,
+            record_id: str | None = None,
+            hits: int | None = None,
+    ) -> str | None:
         try:
             if hits is None:
                 hits = 0
@@ -133,7 +133,7 @@ class SemantiCache:
                 self.cache_index.add_texts(
                     texts=[query],
                     embedding=self.__get_embedder(),
-                    metadatas = [{
+                    metadatas=[{
                             "created_at": created_at,
                             "updated_at": updated_at,
                             "response": response,
@@ -147,7 +147,7 @@ class SemantiCache:
             return record_id
         except Exception as e:
             print(f"Error creating record: {e}")
-    
+
     def __read_record(self, text: str) -> Document | None:
         try:
             if self.cache_index is None:
@@ -175,30 +175,32 @@ class SemantiCache:
             hits=updated_hits,
             record_id=record.metadata["id"]
         )
-    
+
     def __delete_record(self, id: str) -> None:
-        _, _ = self.remove(self.cache_index, [id])
-        self.__persist_cache_state()
+        if self.cache_index:
+            _, _ = self.remove(self.cache_index, [id])
+            self.__persist_cache_state()
 
     @staticmethod
     def remove(vectorstore: FAISS, docstore_ids: list[str]):
         """
         Function to remove documents from the vectorstore.
-        
+
         Parameters
         ----------
         vectorstore : FAISS
             The vectorstore to remove documents from.
         docstore_ids : Optional[List[str]]
-            The list of docstore ids to remove. If None, all documents are removed.
-        
+            The list of docstore ids to remove.
+            If None, all documents are removed.
+
         Returns
         -------
         n_removed : int
             The number of documents removed.
         n_total : int
             The total number of documents in the vectorstore.
-        
+
         Raises
         ------
         ValueError
@@ -223,7 +225,7 @@ class SemantiCache:
         n_total = vectorstore.index.ntotal
         vectorstore.index.remove_ids(np.array(index_ids, dtype=np.int64))
         for i_id, d_id in zip(index_ids, docstore_ids):
-            del vectorstore.docstore._dict[
+            del vectorstore.docstore._dict[  # type: ignore
                 d_id
             ]  # remove the document from the docstore
 
@@ -236,12 +238,15 @@ class SemantiCache:
         }
         return n_removed, n_total
 
-
-
-    def __update_leaderboard(self, query: str, response: str,  hits: int) -> None:
+    def __update_leaderboard(
+            self,
+            query: str,
+            response: str,
+            hits: int
+    ) -> None:
         record = {
             "query": query,
-            "response": response, 
+            "response": response,
             "hits": hits
         }
 
@@ -259,29 +264,37 @@ class SemantiCache:
             leaderboard = []
 
         if not updated:
-            leaderboard.append({"query": query, "response": response, "hits": hits})
+            leaderboard.append({
+                "query": query,
+                "response": response,
+                "hits": hits
+            })
 
         with open(self.leaderboard_path, 'w', encoding="utf-8") as file:
             json.dump(leaderboard, file, indent=4)
 
-    def read_leaderboard(self, top_n: int=5) -> list | None:
+    def read_leaderboard(self, top_n: int = 5) -> list | None:
         try:
             with open(self.leaderboard_path, 'r', encoding="utf-8") as file:
                 leaderboard: list = json.load(file)
 
             if isinstance(leaderboard, list):
-                leaderboard = sorted(leaderboard, key=lambda x: x["hits"], reverse=True)
+                leaderboard = sorted(
+                    leaderboard,
+                    key=lambda x: x["hits"],
+                    reverse=True
+                )
                 return leaderboard[:top_n]
         except Exception as e:
             print(f"error reading leaderboard {e}")
             return None
-    
+
     @staticmethod
     def __get_embedder(
             model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
             device: str = "cpu",
             normalize_embeddings: bool = False,
-        ) -> HuggingFaceEmbeddings:
+    ) -> HuggingFaceEmbeddings:
         embeddings = HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs={"device": device},
@@ -294,19 +307,19 @@ class SemantiCache:
             query: str,
             response: str,
             new_id: str
-        ) -> FAISS:
+    ) -> FAISS | None:
         try:
             cache_index = FAISS.from_texts(
                 texts=[query],
                 embedding=self.__get_embedder(),
-                metadatas = [{
+                metadatas=[{
                         "created_at": datetime.now(),
                         "updated_at": datetime.now(),
                         "response": response,
                         "hits": 0,
                         "id": new_id,
                     }],
-                ids=[new_id]    
+                ids=[new_id]
             )
             print("configured new cache index")
             return cache_index
@@ -323,7 +336,8 @@ class SemantiCache:
         return cache_index
 
     def __persist_cache_state(self) -> None:
-        self.cache_index.save_local(
-            self.cache_path,
-            index_name=self.cache_name
-        )
+        if self.cache_index:
+            self.cache_index.save_local(
+                self.cache_path,
+                index_name=self.cache_name
+            )
