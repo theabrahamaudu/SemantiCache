@@ -18,6 +18,7 @@ server_config: dict = CONFIG_FILE["cache"]
 class SemantiCache:
     def __init__(
             self,
+            trim_by_size: bool = True,
             cache_path: str = server_config["cache_path"],
             cache_name: str = server_config["cache_name"],
             cache_size: int = server_config["cache_size"],
@@ -25,6 +26,7 @@ class SemantiCache:
             threshold: float = server_config["similarity_threshold"],
     ):
 
+        self.trim_by_size = trim_by_size
         self.cache_path = cache_path
         self.leaderboard_path = f"{self.cache_path}/leaderboard.json"
         self.cache_index_object = f"{self.cache_path}/sem_cache_index.pkl"
@@ -84,20 +86,33 @@ class SemantiCache:
             for _id in ids:
                 documents.append(memory.search(_id))  # type: ignore
 
-            if len(documents) > self.cache_size:
-                ref_list = []
+            if self.trim_by_size:
+                # delete the least hit records
+                if len(documents) > self.cache_size:
+                    ref_list = []
+                    for doc in documents:
+                        ref_list.append({
+                            "id": doc.metadata["id"],
+                            "hits": doc.metadata["hits"],
+                        })
+                    sorted_ref_list = sorted(
+                        ref_list,
+                        key=lambda x: x["hits"],
+                        reverse=True
+                    )
+                    for doc in sorted_ref_list[self.cache_size:]:
+                        self.__delete_record(id=doc["id"])
+            else:
+                print("trimming by ttl::")
+                # delete the oldest records
+                curr_time = datetime.now()
                 for doc in documents:
-                    ref_list.append({
-                        "id": doc.metadata["id"],
-                        "hits": doc.metadata["hits"],
-                    })
-                sorted_ref_list = sorted(
-                    ref_list,
-                    key=lambda x: x["hits"],
-                    reverse=True
-                )
-                for doc in sorted_ref_list[self.cache_size:]:
-                    self.__delete_record(id=doc["id"])
+                    delta = (
+                        curr_time - doc.metadata["updated_at"]
+                    ).total_seconds()
+                    if delta > self.ttl:
+                        self.__delete_record(id=doc.metadata["id"])
+
         except Exception as e:
             print(f"unable to trim cache: {e}")
 
@@ -157,9 +172,10 @@ class SemantiCache:
                     text,
                     k=1,
                 )
-                score = record[0][1]
-                if score <= self.threshold:
-                    return record[0][0]
+                if len(record) > 0:
+                    score = record[0][1]
+                    if score <= self.threshold:
+                        return record[0][0]
                 return None
         except Exception as e:
             print(f"Error reading record: {e}")

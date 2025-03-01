@@ -2,7 +2,7 @@ import time
 from semanticache import Cache
 
 start = time.perf_counter()
-cache = Cache()
+cache = Cache(trim_by_size=False)
 end = time.perf_counter() - start
 print("cache load time:: %s secs" % round(end, 2))
 
