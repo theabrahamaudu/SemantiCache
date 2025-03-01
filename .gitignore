@@ -173,3 +173,6 @@ cython_debug/
 # Semantic Cache temp folders
 sem_cache
 sem_config
+
+# VScode stuff
+.vscode

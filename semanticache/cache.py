@@ -3,37 +3,47 @@ import glob
 from datetime import datetime
 import pickle
 import json
+from pathlib import Path
+import yaml
+from typing import Any, Dict
 from ulid import ULID
 import numpy as np
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
-from semanticache.utils.config import Config
-
-CONFIG_FILE: dict = Config().load_config()
-server_config: dict = CONFIG_FILE["cache"]
 
 
 class SemantiCache:
     def __init__(
             self,
-            trim_by_size: bool = True,
-            cache_path: str = server_config["cache_path"],
-            cache_name: str = server_config["cache_name"],
-            cache_size: int = server_config["cache_size"],
-            ttl: int = server_config["cache_ttl"],
-            threshold: float = server_config["similarity_threshold"],
+            trim_by_size: bool | None = None,
+            cache_path: str = "./sem_cache",
+            config_path: str = "./sem_config",
+            cache_size: int | None = None,
+            ttl: int | None = None,
+            threshold: float | None = None,
     ):
-
-        self.trim_by_size = trim_by_size
+        self.cache_name = "sem_cache_index"
         self.cache_path = cache_path
+        self.config_path = config_path
+        self.yaml_path = f"{self.config_path}/sem_config.yaml"
         self.leaderboard_path = f"{self.cache_path}/leaderboard.json"
         self.cache_index_object = f"{self.cache_path}/sem_cache_index.pkl"
-        self.cache_name = cache_name
+
+        # define default params
+        self.def_trim_by_size = True
+        self.def_cache_size = 100
+        self.def_ttl = 3600
+        self.def_threshold = 0.1
+
+        self.trim_by_size = trim_by_size
         self.cache_size = cache_size
         self.ttl = ttl
         self.threshold = threshold
+        self.server_config = self.__load_config()["cache"]
+        self.__check_params()
+        self.__update_config_file()
 
         try:
             self.cache_index = self.__load_cache_index()
@@ -88,7 +98,7 @@ class SemantiCache:
 
             if self.trim_by_size:
                 # delete the least hit records
-                if len(documents) > self.cache_size:
+                if len(documents) > self.cache_size:  # type: ignore
                     ref_list = []
                     for doc in documents:
                         ref_list.append({
@@ -174,7 +184,7 @@ class SemantiCache:
                 )
                 if len(record) > 0:
                     score = record[0][1]
-                    if score <= self.threshold:
+                    if score <= self.threshold:  # type: ignore
                         return record[0][0]
                 return None
         except Exception as e:
@@ -357,3 +367,69 @@ class SemantiCache:
                 self.cache_path,
                 index_name=self.cache_name
             )
+
+    def __check_params(self) -> None:
+        defaults = {
+            "trim_by_size": self.def_trim_by_size,
+            "cache_size": self.def_cache_size,
+            "ttl": self.def_ttl,
+            "threshold": self.def_threshold
+        }
+
+        for key, value in defaults.items():
+            if getattr(self, key) is None:
+                if self.server_config[key] == "None":
+                    setattr(self, key, value)
+                else:
+                    setattr(self, key, self.server_config[key])
+
+    def __load_config(self) -> Dict[str, Any]:
+        try:
+            with open(self.yaml_path, "r", encoding="utf-8") as f:
+                config: dict = yaml.safe_load(f)
+
+            return config
+        except FileNotFoundError:
+            self.__create_directories()
+            self.__create_config_file()
+            with open(self.yaml_path, "r", encoding="utf-8") as f:
+                config: dict = yaml.safe_load(f)
+
+                return config
+
+    def __create_directories(self):
+        """Create the cache and config directories if they don't exist."""
+        cache_dir = Path(self.cache_path)
+        config_dir = Path(self.config_path)
+
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+    def __create_config_file(self):
+        """Create the config.yaml file with predefined content."""
+        config_path = Path(self.yaml_path)
+
+        if not config_path.exists():
+            config_content = f"""cache:
+    path: {self.cache_path}
+    name: {self.cache_name}
+    cache_size: {self.cache_size}
+    ttl: {self.ttl}
+    threshold: {self.threshold}
+    trim_by_size: {self.trim_by_size}
+    """
+            config_path.write_text(config_content, encoding="utf-8")
+
+    def __update_config_file(self):
+        """Update the config.yaml file with predefined content."""
+        config_path = Path(self.yaml_path)
+
+        config_content = f"""cache:
+    path: {self.cache_path}
+    name: {self.cache_name}
+    cache_size: {self.cache_size}
+    ttl: {self.ttl}
+    threshold: {self.threshold}
+    trim_by_size: {self.trim_by_size}
+    """
+        config_path.write_text(config_content, encoding="utf-8")
