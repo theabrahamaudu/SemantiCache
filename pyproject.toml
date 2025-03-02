@@ -33,6 +33,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/theabrahamaudu/SemantiCache.git"
+Documentation = "https://github.com/theabrahamaudu/SemantiCache/blob/main/docs/SemantiCacheDocs.md"
 Issues = "https://github.com/theabrahamaudu/SemantiCache/issues"
 
 [tool.setuptools]
