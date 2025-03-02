@@ -83,16 +83,23 @@ class SemantiCache:
         )
         self.__trim_cache()
 
-    def clear(self) -> None:
+    def clear(self, clear_files: bool = False) -> None:
         """
         Remove all files in the cache directory
         """
         try:
-            files = glob.glob(self.cache_path+"/*")
-            for f in files:
-                os.remove(f)
-            self.cache_index = None
-            self.logger.info("cleared cache files at '%s'" % self.cache_path)
+            n_removed, _ = self.remove(self.cache_index, None)  # type: ignore
+            self.logger.info(
+                "cleared %s records from cache" % n_removed
+            )
+            if clear_files:
+                files = glob.glob(self.cache_path+"/*")
+                for f in files:
+                    os.remove(f)
+                self.cache_index = None
+                self.logger.info(
+                    "cleared cache files at '%s'" % self.cache_path
+                )
         except Exception as e:
             self.logger.exception(
                 "unable to clear cache: %s" % e, exc_info=True
@@ -252,7 +259,9 @@ class SemantiCache:
             )
 
     @staticmethod
-    def remove(vectorstore: FAISS, docstore_ids: list[str]):
+    def remove(
+        vectorstore: FAISS, docstore_ids: list[str] | None
+    ) -> tuple[int, int]:
         """
         Function to remove documents from the vectorstore.
 
@@ -277,7 +286,7 @@ class SemantiCache:
             If there are duplicate ids in the list of ids to remove.
         """
         if docstore_ids is None:
-            vectorstore.docstore = {}
+            vectorstore.docstore = {}  # type: ignore
             vectorstore.index_to_docstore_id = {}
             n_removed = vectorstore.index.ntotal
             n_total = vectorstore.index.ntotal
@@ -292,7 +301,7 @@ class SemantiCache:
             if d_id in docstore_ids
         ]
         n_removed = len(index_ids)
-        n_total = vectorstore.index.ntotal
+        n_total: int = vectorstore.index.ntotal
         vectorstore.index.remove_ids(np.array(index_ids, dtype=np.int64))
         for i_id, d_id in zip(index_ids, docstore_ids):
             del vectorstore.docstore._dict[  # type: ignore

@@ -1,5 +1,6 @@
 click
 pytest
+pytest_cov
 Sphinx
 coverage
 flake8
