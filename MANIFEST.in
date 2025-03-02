@@ -1,0 +1,12 @@
+# Include individual files at the root
+include LICENSE
+include pyproject.toml
+include README.md
+include requirements.txt
+
+# Recursively include directories
+recursive-include docs *
+recursive-include tests *
+recursive-include semanticache *
+
+

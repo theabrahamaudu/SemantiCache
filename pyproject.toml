@@ -23,7 +23,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/theabrahamaudu/SemantiCache.git"
+Homepage = "https://github.com/theabrahamaudu/SemantiCache.git"
 Documentation = "https://github.com/theabrahamaudu/SemantiCache/blob/main/docs/SemantiCacheDocs.md"
 Issues = "https://github.com/theabrahamaudu/SemantiCache/issues"
 
