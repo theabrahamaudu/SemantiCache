@@ -16,7 +16,49 @@ from semanticache.utils.logger import logger as log_handler
 
 
 class SemantiCache:
+    """
+    A semantic caching system that stores and retrieves query-response pairs
+    using FAISS-based vector search.
 
+    This class provides a caching mechanism to store responses to queries,
+    enabling faster retrieval by leveraging semantic similarity. It supports
+    automatic cache trimming based on size or time-to-live (TTL) and maintains
+    a leaderboard of the most frequently accessed queries.
+
+    #### Note: if `trim_by_size` is set to `False`, trims cache by TTL.
+
+    Attributes:
+        `logger`: Logger instance for handling log messages.
+        `cache_name` (str): Name of the cache index.
+        `cache_path` (str): Path to the cache directory.
+        `config_path` (str): Path to the configuration directory.
+        `yaml_path` (str): Path to the YAML configuration file.
+        `leaderboard_path` (str): Path to the leaderboard JSON file.
+        `cache_index_object` (str): Path to the serialized cache index object.
+        `trim_by_size` (bool | None): Whether to trim the cache by size.
+        `cache_size` (int | None): Maximum number of records in the cache.
+        `ttl` (int | None): Time-to-live (TTL) for cache entries.
+        `threshold` (float | None): Similarity threshold for retrieving cache
+         entries.
+        `leaderboard_top_n` (int | None): Number of top queries to keep in the
+        leaderboard.
+        `server_config` (dict): Configuration loaded from the YAML file.
+        `cache_index` (FAISS | None): The FAISS vector store used for caching.
+
+    Methods:
+        `get`(query: str) -> str | None:
+            Retrieves a cached response based on semantic similarity.
+
+        `set`(query: str, response: str) -> None:
+            Stores a query-response pair in the cache.
+
+        `clear`(clear_files: bool = False) -> None:
+            Clears the cache, optionally deleting stored cache files.
+
+        `read_leaderboard`() -> list | None:
+            Reads the leaderboard of the most accessed queries.
+
+    """
     def __init__(
             self,
             trim_by_size: bool | None = None,
@@ -28,6 +70,55 @@ class SemantiCache:
             leaderboard_top_n: int | None = None,
             log_level: str = "WARNING"
     ):
+        """
+        Initializes the SemantiCache instance.
+
+        Args:
+            trim_by_size (bool | None, optional): Whether to trim the cache by
+            size. Defaults to None.
+            cache_path (str, optional): Path to the cache directory.
+            Defaults to "./sem_cache".
+            config_path (str, optional): Path to the configuration directory.
+            Defaults to "./sem_config".
+            cache_size (int | None, optional): Maximum number of records in
+            the cache. Defaults to None.
+            ttl (int | None, optional): Time-to-live (TTL) for cache entries
+            in seconds. Defaults to None.
+            threshold (float | None, optional): Similarity threshold for
+            retrieving cache entries. Defaults to None.
+            leaderboard_top_n (int | None, optional): Number of top queries to
+            keep in the leaderboard. Defaults to None.
+            log_level (str, optional): Logging level. Defaults to "WARNING".
+
+        Attributes:
+            logger: Logger instance for handling log messages.
+            cache_name (str): Name of the cache index.
+            cache_path (str): Path to the cache directory.
+            config_path (str): Path to the configuration directory.
+            yaml_path (str): Path to the YAML configuration file.
+            leaderboard_path (str): Path to the leaderboard JSON file.
+            cache_index_object (str): Path to the serialized cache index
+            object.
+            def_trim_by_size (bool): Default value for `trim_by_size`.
+            def_cache_size (int): Default cache size.
+            def_ttl (int): Default time-to-live (TTL) for cache entries.
+            def_threshold (float): Default similarity threshold.
+            def_leaderboard_top_n (int): Default number of leaderboard entries.
+            trim_by_size (bool | None): Whether to trim the cache by size.
+            cache_size (int | None): Maximum number of records in the cache.
+            ttl (int | None): Time-to-live (TTL) for cache entries.
+            threshold (float | None): Similarity threshold for retrieving
+            cache entries.
+            leaderboard_top_n (int | None): Number of top queries to keep in
+            the leaderboard.
+            server_config (dict): Configuration loaded from the YAML file.
+            cache_index (FAISS | None): The FAISS vector store used for
+            caching.
+
+        Raises:
+            Exception: If an error occurs while loading the cache index.
+        """
+
         self.logger = log_handler(log_level)
         self.cache_name = "sem_cache_index"
         self.cache_path = cache_path
@@ -64,6 +155,22 @@ class SemantiCache:
             self.cache_index = None
 
     def get(self, query: str) -> str | None:
+        """
+        Retrieve a cached response based on semantic similarity.
+
+        This method searches for a query in the cache. If a matching record is
+        found,
+        it updates the last accessed timestamp, increments the hit count, and
+        updates
+        the leaderboard. If no record is found, it returns None.
+
+        Args:
+            query (str): The input query to search for in the cache.
+
+        Returns:
+            response (str | None): The cached response if found, otherwise
+            None.
+        """
         record = self.__read_record(query)
         if record is not None:
             self.__update_record(record, datetime.now())
@@ -76,6 +183,20 @@ class SemantiCache:
         return record
 
     def set(self, query: str, response: str) -> None:
+        """
+        Store a query-response pair in the cache.
+
+        This method creates a new cache record for the given query and
+        response.
+        It also trims the cache if necessary to maintain size constraints.
+
+        Args:
+            query (str): The input query to store in the cache.
+            response (str): The corresponding response to be cached.
+
+        Returns:
+            None:
+        """
         self.__create_record(
             created_at=datetime.now(),
             query=query,
@@ -85,7 +206,23 @@ class SemantiCache:
 
     def clear(self, clear_files: bool = False) -> None:
         """
-        Remove all files in the cache directory
+        Clear all records from the cache.
+
+        This method removes all stored records from the cache index.
+        If `clear_files`
+        is set to True, it also deletes all cache files from the cache
+        directory.
+
+        Args:
+            clear_files (bool, optional): If `True`, deletes all files in the\
+                cache directory.
+                Defaults to `False`.
+
+        Returns:
+            None:
+
+        Raises:
+            Exception: If an error occurs while clearing the cache.
         """
         try:
             n_removed, _ = self.remove(self.cache_index, None)  # type: ignore
@@ -106,6 +243,19 @@ class SemantiCache:
             )
 
     def __trim_cache(self) -> None:
+        """
+        Trim the cache based on size or time-to-live (TTL).
+
+        This method ensures the cache does not exceed its configured size
+        or TTL.
+        If trimming by size, it removes the least accessed records when
+        the cache
+        exceeds the maximum limit. If trimming by TTL, it deletes records older
+        than the allowed time threshold.
+
+        Raises:
+            Exception: If an error occurs while trimming the cache.
+        """
         try:
             index = pickle.load(open(self.cache_index_object, "rb"))
             memory: InMemoryDocstore = index[0]
@@ -168,6 +318,36 @@ class SemantiCache:
             record_id: str | None = None,
             hits: int | None = None,
     ) -> str | None:
+        """
+        Creates and stores a new cache record.
+
+        This method generates a new cache entry with metadata,
+        including timestamps,
+        response content, and access count. If no existing cache index
+        is found, it
+        attempts to load one or create a new index. The record is then
+        added to the
+        cache, and the state is persisted.
+
+        Args:
+            `created_at` (datetime): The timestamp when the record is created.
+            `query` (str): The query string associated with the cache entry.
+            `response` (str): The response content to be cached.
+            `updated_at` (datetime, optional): The timestamp of the
+            last update. Defaults to `created_at`.
+            `record_id` (str, optional): A unique identifier for the record.
+            Defaults to a new ULID.
+            `hits` (int, optional): The number of times the record has been
+            accessed. Defaults to 0.
+
+        Returns:
+            record_id (str | None):
+                The record ID if successfully created, else None.
+
+        Raises:
+            Exception: If an error occurs during cache index loading or
+            record creation.
+        """
         try:
             if hits is None:
                 hits = 0
@@ -213,6 +393,26 @@ class SemantiCache:
             self.logger.error("error creating record: %s" % e)
 
     def __read_record(self, text: str) -> Document | None:
+        """
+        Retrieves a cached record based on a similarity search.
+
+        This method searches the cache for a record that closely matches\
+            the given
+        query text. If a matching record is found with a similarity score\
+            below the
+        defined threshold, it is returned. Otherwise, None is returned.
+
+        Args:
+            text (str): The query text used for searching the cache.
+
+        Returns:
+            record (Document | None): The matching record if found within the\
+                threshold, else None.
+
+        Raises:
+            Exception: Logs an error if an issue occurs while reading the\
+                cache.
+        """
         try:
             if self.cache_index is None:
                 return None
@@ -230,6 +430,24 @@ class SemantiCache:
             self.logger.error("error reading record: %s" % e)
 
     def __update_record(self, record: Document, updated_at: datetime) -> None:
+        """
+        Updates an existing cached record by incrementing its hit count
+        and refreshing the update timestamp.
+
+        This method removes the existing record from the cache and recreates
+        it with an incremented hit count and a new update timestamp.
+
+        Args:
+            record (Document): The cached document to update.
+            updated_at (datetime): The timestamp marking when the record was\
+                updated.
+
+        Returns:
+            None:
+
+        Raises:
+            Exception: Logs an error if the update process fails.
+        """
         try:
             updated_hits = int(record.metadata["hits"]) + 1
             self.__delete_record(id=record.metadata["id"])
@@ -248,6 +466,21 @@ class SemantiCache:
             )
 
     def __delete_record(self, id: str) -> None:
+        """
+        Deletes a record from the cache based on its unique identifier.
+
+        This method removes the specified record from the cache index and
+        persists the updated cache state.
+
+        Args:
+            id (str): The unique identifier of the record to be deleted.
+
+        Returns:
+            None:
+
+        Raises:
+            Exception: Logs an error if the deletion process fails.
+        """
         try:
             if self.cache_index:
                 _, _ = self.remove(self.cache_index, [id])
@@ -263,27 +496,25 @@ class SemantiCache:
         vectorstore: FAISS, docstore_ids: list[str] | None
     ) -> tuple[int, int]:
         """
-        Function to remove documents from the vectorstore.
+        Removes specified records from the FAISS vector store.
 
-        Parameters
-        ----------
-        vectorstore : FAISS
-            The vectorstore to remove documents from.
-        docstore_ids : Optional[List[str]]
-            The list of docstore ids to remove.
-            If None, all documents are removed.
+        This method deletes records from the vector store based on the\
+            provided document IDs.
+        If no IDs are provided, the entire vector store is cleared.
 
-        Returns
-        -------
-        n_removed : int
-            The number of documents removed.
-        n_total : int
-            The total number of documents in the vectorstore.
+        Args:
+            vectorstore (FAISS): The FAISS vector store instance.
+            docstore_ids (list[str] | None): A list of document IDs to be\
+                removed.
+                If None, all records in the vector store are deleted.
 
-        Raises
-        ------
-        ValueError
-            If there are duplicate ids in the list of ids to remove.
+        Returns:
+            tuple([int, int]): A tuple containing:
+                - n_removed (int): The number of records removed.
+                - n_total (int): The total number of records before removal.
+
+        Raises:
+            ValueError: If duplicate IDs are found in the provided list.
         """
         if docstore_ids is None:
             vectorstore.docstore = {}  # type: ignore
@@ -323,6 +554,32 @@ class SemantiCache:
             response: str,
             hits: int
     ) -> None:
+        """
+        Updates the leaderboard with the most frequently queried records.
+
+        This method maintains a leaderboard of the top queries based on the\
+            number of hits.
+        If a query already exists, its hit count is updated. Otherwise, it is\
+            added to the leaderboard.
+        The leaderboard is then sorted and truncated to keep only the\
+            top N records.
+
+        Args:
+            query (str): The queried text.
+            response (str): The response associated with the query.
+            hits (int): The number of times the query has been accessed.
+
+        Behavior:
+            - Reads the existing leaderboard from a JSON file.
+            - Updates the hit count if the query is already present.
+            - Adds new queries if not present.
+            - Sorts and limits the leaderboard to the top N queries.
+            - Saves the updated leaderboard back to the file.
+
+        Logs:
+            - Warns if no leaderboard file is found and creates a new one.
+            - Logs when the leaderboard is successfully updated.
+        """
         record = {
             "query": query,
             "response": response,
@@ -366,6 +623,20 @@ class SemantiCache:
         self.logger.info("updated leaderboard at %s" % self.leaderboard_path)
 
     def read_leaderboard(self) -> list | None:
+        """
+        Reads and returns the leaderboard data from the stored JSON file.
+
+        This method attempts to load the leaderboard, which contains the\
+            top queries
+        based on their hit counts.
+
+        Returns:
+            leaderboard (list | None): A list of leaderboard records if\
+                successfully read, or None if an error occurs.
+
+        Logs:
+            - Logs an error message if the leaderboard file cannot be read.
+        """
         try:
             with open(self.leaderboard_path, 'r', encoding="utf-8") as file:
                 leaderboard: list = json.load(file)
@@ -380,6 +651,24 @@ class SemantiCache:
             device: str = "cpu",
             normalize_embeddings: bool = False,
     ) -> HuggingFaceEmbeddings:
+        """
+        Initializes and returns a HuggingFace embeddings model.
+
+        Args:
+            model_name (str, optional):\
+                The name of the sentence-transformer model to use.
+                Defaults to "sentence-transformers/all-MiniLM-L6-v2".
+            device (str, optional):\
+                The device to run the model on, e.g., "cpu" or "cuda".
+                Defaults to "cpu".
+            normalize_embeddings (bool, optional):\
+                Whether to normalize embeddings.
+                Defaults to False.
+
+        Returns:
+            HuggingFaceEmbeddings:\
+                An instance of the HuggingFace embeddings model.
+        """
         embeddings = HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs={"device": device},
@@ -393,6 +682,18 @@ class SemantiCache:
             response: str,
             new_id: str
     ) -> FAISS | None:
+        """
+        Creates and configures a new FAISS cache index with an initial record.
+
+        Args:
+            query (str): The query text to be stored in the cache.
+            response (str): The corresponding response text.
+            new_id (str): The unique identifier for the record.
+
+        Returns:
+            cache_index (FAISS | None):\
+                A configured FAISS index if successful, otherwise None.
+        """
         try:
             cache_index = FAISS.from_texts(
                 texts=[query],
@@ -417,6 +718,15 @@ class SemantiCache:
             )
 
     def __load_cache_index(self) -> FAISS:
+        """
+        Loads a FAISS cache index from the local storage.
+
+        Returns:
+            FAISS: The loaded FAISS index.
+
+        Raises:
+            Any exceptions encountered during loading will be logged.
+        """
         cache_index = FAISS.load_local(
             folder_path=self.cache_path,
             embeddings=self.__get_embedder(),
@@ -426,6 +736,17 @@ class SemantiCache:
         return cache_index
 
     def __persist_cache_state(self) -> None:
+        """
+        Saves the current state of the FAISS cache index to local storage.
+
+        This method ensures that any updates made to the cache index\
+            are persisted
+        by saving the index to the specified cache path.
+
+        Raises:
+            Any exceptions encountered during the save operation\
+                will be logged.
+        """
         if self.cache_index:
             self.cache_index.save_local(
                 self.cache_path,
@@ -433,6 +754,19 @@ class SemantiCache:
             )
 
     def __check_params(self) -> None:
+        """
+        Validates and sets default values for cache configuration parameters.
+
+        This method ensures that key cache settings\
+            (e.g., cache size, TTL, threshold)
+        are correctly initialized. If a parameter is `None`,\
+            it is assigned a default value.
+        If a parameter differs from the server configuration,\
+            a warning is logged.
+
+        Raises:
+            Logs warnings if configuration values are overridden.
+        """
         defaults = {
             "trim_by_size": self.def_trim_by_size,
             "cache_size": self.def_cache_size,
@@ -455,6 +789,23 @@ class SemantiCache:
                 )
 
     def __load_config(self) -> Dict[str, Any]:
+        """
+        Loads the configuration settings from a YAML file.
+
+        This method attempts to read the YAML configuration file specified by\
+            `self.yaml_path`.
+        If the file is missing, it creates the necessary directories and\
+            a default config file before reloading the configuration.
+
+        Returns:
+            config (Dict[str, Any]):\
+                A dictionary containing the loaded configuration settings.
+
+        Logs:
+            - Info: When the configuration is successfully loaded.
+            - Warning: If the configuration file is not found,\
+                triggering initialization.
+        """
         try:
             with open(self.yaml_path, "r", encoding="utf-8") as f:
                 config: dict = yaml.safe_load(f)
@@ -475,7 +826,7 @@ class SemantiCache:
                 )
                 return config
 
-    def __create_directories(self):
+    def __create_directories(self) -> None:
         """Create the cache and config directories if they don't exist."""
         cache_dir = Path(self.cache_path)
         config_dir = Path(self.config_path)
@@ -489,8 +840,8 @@ class SemantiCache:
             "created config dir at '%s'" % self.config_path
         )
 
-    def __create_config_file(self):
-        """Create yaml file with predefined content."""
+    def __create_config_file(self) -> None:
+
         config_path = Path(self.yaml_path)
 
         if not config_path.exists():
@@ -508,7 +859,7 @@ class SemantiCache:
                 "created config file at '%s'" % self.yaml_path
             )
 
-    def __update_config_file(self):
+    def __update_config_file(self) -> None:
         """Update the config.yaml file with predefined content."""
         config_path = Path(self.yaml_path)
 

@@ -19,6 +19,10 @@ pip install semanticache
 
 ## Usage
 
+### Full Documentation
+Read the [docs](https://github.com/theabrahamaudu/SemantiCache/blob/main/docs/SemantiCacheDocs.md)
+_________________________________________________________________________
+
 ### Initializing SemantiCache
 
 ```python
@@ -110,24 +114,28 @@ else:
 - **By Size:** Keeps the most accessed entries up to `cache_size`
 - **By Time (TTL):** Removes entries older than `ttl` seconds
 
+    This is toggled by setting `trim_by_size` to `True` or `False` in config file or during initialization in script
+
 ### Similarity Threshold
 - Determines when a query matches an existing cache entry
 - A lower threshold increases exact matches, while a higher one allows more flexible retrieval
 
 ## Dependencies
 - `FAISS` for vector similarity search
-- `HuggingFace` for embedding generation
+- `HuggingFace` from `Langchain Community` for embedding generation
 - `yaml`, `numpy`, `json`, and `pickle` for serialization
 
 ## Help
 Feel free to reach out to me or create a new issue if you encounter any problems using SemantiCache
 
-## Possible Improvements/Ideas
+## Contribution: Possible Improvements/Ideas
 
 - [ ] More unit tests
 - [ ] Less dependence on other libraries
 - [ ] Support for alternate vector index engines like ChromaDB, Milvus, etc.
 - [ ] More optimized logic where possible
+- [ ] Implement more sophisticated ranking and pruning algorithms.
+- [ ] Support additional embedding models for improved semantic search.
 
 ## Authors
 
