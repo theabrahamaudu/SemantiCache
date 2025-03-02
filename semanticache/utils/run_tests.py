@@ -8,7 +8,7 @@ logger = log_handler()
 
 README_FILE = "README.md"
 BADGE_TEMPLATE = "![Coverage]\
-    (https://img.shields.io/badge/coverage-{percentage}%25-brightgreen)"
+(https://img.shields.io/badge/coverage-{percentage}%25-brightgreen)"
 
 
 def extract_coverage_from_xml(report_dir):
