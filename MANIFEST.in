@@ -9,4 +9,8 @@ recursive-include docs *
 recursive-include tests *
 recursive-include semanticache *
 
+# Recursively exclude __pycache__ dirs
+recursive-exclude */__pycache__/*
+Recursively-exclude *.pyc
+
 

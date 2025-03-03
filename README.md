@@ -26,9 +26,9 @@ _________________________________________________________________________
 ### Initializing SemantiCache
 
 ```python
-from semanticache import SemantiCache
+from semanticache import Cache
 
-cache = SemantiCache(
+cache = Cache(
     trim_by_size=True,
     cache_path="./sem_cache",
     config_path="./sem_config",
@@ -85,14 +85,14 @@ cache:
 This example demonstrates how to check the cache before querying an LLM and how to store responses when needed.
 
 ```python
-from semanticache import SemantiCache
+from semanticache import Cache
 
 def call_llm(query):
     """Simulate an LLM call (replace with actual API call)."""
     return f"Response for: {query}"
 
 # Initialize the cache
-cache = SemantiCache()
+cache = Cache()
 
 # Example query
 query = "What is the capital of France?"

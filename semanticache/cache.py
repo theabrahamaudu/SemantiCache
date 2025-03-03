@@ -363,9 +363,12 @@ class SemantiCache:
                         % self.cache_path
                     )
                 except Exception as e:
-                    self.logger.exception(
+                    self.logger.warning(
                         "unable to load cache from %s for record creation: %s"
-                        % (self.cache_path, e), exc_info=True
+                        % (self.cache_path, e)
+                    )
+                    self.logger.warning(
+                        "Creating new cache index at %s" % self.cache_path
                     )
                     self.cache_index = self.__configure_cache_index(
                         query=query,
