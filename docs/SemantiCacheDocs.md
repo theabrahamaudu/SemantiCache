@@ -109,10 +109,10 @@ These parameters control aspects like cache size, time-to-live for entries, simi
 Below is a basic example of how to use SemantiCache:
 
 ```python
-from semantichache import Cache
+from semantichache import SemantiCache
 
 # Initialize the cache
-semantic_cache = Cache()
+semantic_cache = SemantiCache()
 
 # Attempt to retrieve a cached response
 query = "What is artificial intelligence?"

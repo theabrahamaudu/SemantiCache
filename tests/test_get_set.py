@@ -1,6 +1,6 @@
 import tempfile
 import pytest
-from semanticache import Cache
+from semanticache import SemantiCache as Cache
 
 
 query_str = "How many bananas do we need?"
